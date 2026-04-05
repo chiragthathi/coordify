@@ -1,0 +1,440 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: coordify-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - coordify_mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: coordify-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: coordify-rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - coordify_rabbitmq_data:/var/lib/rabbitmq
+
+  api-gateway:
+    image: node:20-alpine
+    container_name: coordify-api-gateway
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+    ports:
+      - '4000:4000'
+    environment:
+      SERVICE_NAME: api-gateway
+      PORT: 4000
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_api_gateway_service
+      REDIS_CACHE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROJECTS_SERVICE_URL: http://projects-service:4002
+      TASKS_SERVICE_URL: http://tasks-service:4003
+      TEAM_SERVICE_URL: http://team-service:4004
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:4005
+      REPORTS_SERVICE_URL: http://reports-service:4006
+      SETTINGS_SERVICE_URL: http://settings-service:4007
+      SERVICE_REGISTRY_RESEED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+
+  api-gateway-2:
+    image: node:20-alpine
+    container_name: coordify-api-gateway-2
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+    ports:
+      - '4001:4001'
+    environment:
+      SERVICE_NAME: api-gateway
+      PORT: 4001
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_api_gateway_service
+      REDIS_CACHE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROJECTS_SERVICE_URL: http://projects-service:4002
+      TASKS_SERVICE_URL: http://tasks-service:4003
+      TEAM_SERVICE_URL: http://team-service:4004
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:4005
+      REPORTS_SERVICE_URL: http://reports-service:4006
+      SETTINGS_SERVICE_URL: http://settings-service:4007
+      SERVICE_REGISTRY_RESEED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+
+  api-load-balancer:
+    image: node:20-alpine
+    container_name: coordify-api-load-balancer
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - api-gateway
+      - api-gateway-2
+    ports:
+      - '4100:4100'
+    environment:
+      PORT: 4100
+      UPSTREAMS: http://api-gateway:4000,http://api-gateway-2:4001
+    volumes:
+      - ./services/api-load-balancer:/app
+      - /app/node_modules
+
+  auth-service:
+    image: node:20-alpine
+    container_name: coordify-auth-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    ports:
+      - '5001:4001'
+    environment:
+      SERVICE_NAME: auth-service
+      PORT: 4001
+      NODE_ENV: development
+      JWT_SECRET: replace-this-secret
+      TOKEN_TTL: 1h
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_auth_service
+      REDIS_TOKEN_STORE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      OTP_TTL_SECONDS: 120
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: auth.notifications
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/auth-service:/app
+      - /app/node_modules
+
+  projects-service:
+    image: node:20-alpine
+    container_name: coordify-projects-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    ports:
+      - '5002:4002'
+    environment:
+      SERVICE_NAME: projects-service
+      PORT: 4002
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_projects_service
+      REDIS_CACHE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: project.notifications
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/projects-service:/app
+      - /app/node_modules
+
+  tasks-service:
+    image: node:20-alpine
+    container_name: coordify-tasks-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    ports:
+      - '5003:4003'
+    environment:
+      SERVICE_NAME: tasks-service
+      PORT: 4003
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_tasks_service
+      REDIS_CACHE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: task.notifications
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:4005
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/tasks-service:/app
+      - /app/node_modules
+
+  team-service:
+    image: node:20-alpine
+    container_name: coordify-team-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - rabbitmq
+    ports:
+      - '5004:4004'
+    environment:
+      SERVICE_NAME: team-service
+      PORT: 4004
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_team_service
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: team.notifications
+      FRONTEND_APP_URL: http://localhost:5173
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/team-service:/app
+      - /app/node_modules
+
+  notifications-service:
+    image: node:20-alpine
+    container_name: coordify-notifications-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - rabbitmq
+    ports:
+      - '5005:4005'
+    environment:
+      SERVICE_NAME: notifications-service
+      PORT: 4005
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_notifications_service
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: task.notifications
+      RABBITMQ_TASK_EVENTS_QUEUE: coordify.task.events.q
+      RABBITMQ_DLX: coordify.events.dlx
+      RABBITMQ_DLQ: coordify.task.events.dlq
+      RABBITMQ_DLQ_ROUTING_KEY: task.created.dead
+      RABBITMQ_PREFETCH: 10
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@coordify.local}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/notifications-service:/app
+      - /app/node_modules
+
+  notifications-worker-1:
+    image: node:20-alpine
+    container_name: coordify-notifications-worker-1
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run worker"
+    depends_on:
+      - mongodb
+      - rabbitmq
+    environment:
+      SERVICE_NAME: notifications-service
+      NODE_ENV: development
+      WORKER_ID: worker-1
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_notifications_service
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: task.notifications
+      RABBITMQ_TASK_EVENTS_QUEUE: coordify.task.events.q
+      RABBITMQ_DLX: coordify.events.dlx
+      RABBITMQ_DLQ: coordify.task.events.dlq
+      RABBITMQ_DLQ_ROUTING_KEY: task.created.dead
+      RABBITMQ_PREFETCH: 10
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@coordify.local}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/notifications-service:/app
+      - /app/node_modules
+
+  reports-service:
+    image: node:20-alpine
+    container_name: coordify-reports-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    ports:
+      - '5006:4006'
+    environment:
+      SERVICE_NAME: reports-service
+      PORT: 4006
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_reports_service
+      REDIS_CACHE_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'false'
+      REDIS_CACHE_TTL_SECONDS: 120
+      AI_REPORTS_ENABLED: 'true'
+      GEMINI_MODEL: gemini-1.5-flash
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: reports.notifications
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/reports-service:/app
+      - /app/node_modules
+
+  settings-service:
+    image: node:20-alpine
+    container_name: coordify-settings-service
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - mongodb
+      - rabbitmq
+    ports:
+      - '5007:4007'
+    environment:
+      SERVICE_NAME: settings-service
+      PORT: 4007
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: coordify_settings_service
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: coordify.events
+      RABBITMQ_ROUTING_KEY: settings.notifications
+      INTERNAL_SERVICE_AUTH_ENABLED: 'true'
+      INTERNAL_SERVICE_TOKEN: coordify-internal-token-change-me
+    volumes:
+      - ./services/settings-service:/app
+      - /app/node_modules
+
+  frontend:
+    image: node:20-alpine
+    container_name: coordify-frontend
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - api-load-balancer
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_GATEWAY_URL: http://localhost:4100
+      VITE_API_PREFIX: /api/v1
+    volumes:
+      - ../coordify:/app
+      - /app/node_modules
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: coordify-prometheus
+    restart: unless-stopped
+    depends_on:
+      - api-load-balancer
+      - api-gateway
+      - api-gateway-2
+      - auth-service
+      - projects-service
+      - tasks-service
+      - team-service
+      - notifications-service
+      - reports-service
+      - settings-service
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - coordify_prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: coordify-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - '3001:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - coordify_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  coordify_mongo_data:
+  coordify_rabbitmq_data:
+  coordify_prometheus_data:
+  coordify_grafana_data:

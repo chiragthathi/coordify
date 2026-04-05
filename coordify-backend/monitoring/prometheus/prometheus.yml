@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'api-load-balancer'
+    static_configs:
+      - targets: ['api-load-balancer:4100']
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:4000', 'api-gateway-2:4001']
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:4001']
+
+  - job_name: 'projects-service'
+    static_configs:
+      - targets: ['projects-service:4002']
+
+  - job_name: 'tasks-service'
+    static_configs:
+      - targets: ['tasks-service:4003']
+
+  - job_name: 'team-service'
+    static_configs:
+      - targets: ['team-service:4004']
+
+  - job_name: 'notifications-service'
+    static_configs:
+      - targets: ['notifications-service:4005']
+
+  - job_name: 'reports-service'
+    static_configs:
+      - targets: ['reports-service:4006']
+
+  - job_name: 'settings-service'
+    static_configs:
+      - targets: ['settings-service:4007']

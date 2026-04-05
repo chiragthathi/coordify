@@ -1,0 +1,795 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: coordify
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: coordify-secrets
+  namespace: coordify
+type: Opaque
+stringData:
+  JWT_SECRET: replace-this-secret
+  GEMINI_API_KEY: replace-with-real-key
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: coordify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: coordify
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: coordify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: coordify
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: coordify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: coordify
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: coordify/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4001
+          env:
+            - name: PORT
+              value: "4001"
+            - name: NODE_ENV
+              value: production
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: coordify-secrets
+                  key: JWT_SECRET
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_auth_service
+            - name: REDIS_TOKEN_STORE_ENABLED
+              value: "true"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: coordify
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 4001
+      targetPort: 4001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projects-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: projects-service
+  template:
+    metadata:
+      labels:
+        app: projects-service
+    spec:
+      containers:
+        - name: projects-service
+          image: coordify/projects-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+          env:
+            - name: PORT
+              value: "4002"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_projects_service
+            - name: REDIS_CACHE_ENABLED
+              value: "true"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: REDIS_CACHE_TTL_SECONDS
+              value: "120"
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: projects-service
+  namespace: coordify
+spec:
+  selector:
+    app: projects-service
+  ports:
+    - port: 4002
+      targetPort: 4002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasks-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tasks-service
+  template:
+    metadata:
+      labels:
+        app: tasks-service
+    spec:
+      containers:
+        - name: tasks-service
+          image: coordify/tasks-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4003
+          env:
+            - name: PORT
+              value: "4003"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_tasks_service
+            - name: REDIS_CACHE_ENABLED
+              value: "true"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: REDIS_CACHE_TTL_SECONDS
+              value: "120"
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+          resources:
+            requests:
+              cpu: 150m
+              memory: 192Mi
+            limits:
+              cpu: 700m
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tasks-service
+  namespace: coordify
+spec:
+  selector:
+    app: tasks-service
+  ports:
+    - port: 4003
+      targetPort: 4003
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tasks-service-hpa
+  namespace: coordify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tasks-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: team-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: team-service
+  template:
+    metadata:
+      labels:
+        app: team-service
+    spec:
+      containers:
+        - name: team-service
+          image: coordify/team-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4004
+          env:
+            - name: PORT
+              value: "4004"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_team_service
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: team-service
+  namespace: coordify
+spec:
+  selector:
+    app: team-service
+  ports:
+    - port: 4004
+      targetPort: 4004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-service
+  namespace: coordify
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: notifications-service
+  template:
+    metadata:
+      labels:
+        app: notifications-service
+    spec:
+      containers:
+        - name: notifications-service
+          image: coordify/notifications-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4005
+          env:
+            - name: PORT
+              value: "4005"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_notifications_service
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+  namespace: coordify
+spec:
+  selector:
+    app: notifications-service
+  ports:
+    - port: 4005
+      targetPort: 4005
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notifications-service-hpa
+  namespace: coordify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notifications-service
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: reports-service
+  template:
+    metadata:
+      labels:
+        app: reports-service
+    spec:
+      containers:
+        - name: reports-service
+          image: coordify/reports-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4006
+          env:
+            - name: PORT
+              value: "4006"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_reports_service
+            - name: REDIS_CACHE_ENABLED
+              value: "true"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: REDIS_CACHE_TTL_SECONDS
+              value: "120"
+            - name: AI_REPORTS_ENABLED
+              value: "true"
+            - name: GEMINI_MODEL
+              value: gemini-1.5-flash
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: coordify-secrets
+                  key: GEMINI_API_KEY
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+          resources:
+            requests:
+              cpu: 150m
+              memory: 192Mi
+            limits:
+              cpu: 700m
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4006
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4006
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reports-service
+  namespace: coordify
+spec:
+  selector:
+    app: reports-service
+  ports:
+    - port: 4006
+      targetPort: 4006
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: reports-service-hpa
+  namespace: coordify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: reports-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: settings-service
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: settings-service
+  template:
+    metadata:
+      labels:
+        app: settings-service
+    spec:
+      containers:
+        - name: settings-service
+          image: coordify/settings-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4007
+          env:
+            - name: PORT
+              value: "4007"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_settings_service
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: settings-service
+  namespace: coordify
+spec:
+  selector:
+    app: settings-service
+  ports:
+    - port: 4007
+      targetPort: 4007
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: coordify/api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          env:
+            - name: PORT
+              value: "4000"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongodb:27017
+            - name: MONGODB_DB_NAME
+              value: coordify_api_gateway_service
+            - name: REDIS_CACHE_ENABLED
+              value: "true"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: PROXY_TIMEOUT_MS
+              value: "20000"
+            - name: RATE_LIMIT_MAX
+              value: "100000"
+            - name: RATE_LIMIT_WINDOW_MS
+              value: "60000"
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:4001
+            - name: PROJECTS_SERVICE_URL
+              value: http://projects-service:4002
+            - name: TASKS_SERVICE_URL
+              value: http://tasks-service:4003
+            - name: TEAM_SERVICE_URL
+              value: http://team-service:4004
+            - name: NOTIFICATIONS_SERVICE_URL
+              value: http://notifications-service:4005
+            - name: REPORTS_SERVICE_URL
+              value: http://reports-service:4006
+            - name: SETTINGS_SERVICE_URL
+              value: http://settings-service:4007
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: coordify
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: coordify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-load-balancer
+  namespace: coordify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-load-balancer
+  template:
+    metadata:
+      labels:
+        app: api-load-balancer
+    spec:
+      containers:
+        - name: api-load-balancer
+          image: coordify/api-load-balancer:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4100
+          env:
+            - name: PORT
+              value: "4100"
+            - name: UPSTREAMS
+              value: http://api-gateway:4000
+            - name: UPSTREAM_TIMEOUT_MS
+              value: "8000"
+            - name: UPSTREAM_RETRY_ATTEMPTS
+              value: "1"
+            - name: UPSTREAM_UNHEALTHY_COOLDOWN_MS
+              value: "15000"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4100
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-load-balancer
+  namespace: coordify
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-load-balancer
+  ports:
+    - port: 80
+      targetPort: 4100
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-load-balancer-hpa
+  namespace: coordify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-load-balancer
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65

@@ -1,0 +1,13 @@
+{
+  "name": "@coordify/api-load-balancer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "prom-client": "^15.1.3"
+  }
+}

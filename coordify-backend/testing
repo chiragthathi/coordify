@@ -1,0 +1,30 @@
+Coordify Latest Load Test Report
+Date: 2026-04-04
+Environment: Docker Desktop Kubernetes (local)
+
+Data Source
+- load-tests/k6-latest-summary.json
+
+Test Setup
+- Tool: k6 v0.53.0
+- Script: load-tests/k6-60k.js
+- Profile: local-stepped
+- Target endpoint: http://127.0.0.1:4100
+
+Latest Results
+- http_reqs: 22,307
+- iterations: 22,304
+- throughput: 229.63 req/s
+- checks passed: 20,487
+- checks failed: 1,817
+- check pass rate: 91.85%
+- http_req_failed rate: 8.16%
+- http_req_duration avg: 1,151.92 ms
+- http_req_duration p90: 3,834.67 ms
+- http_req_duration p95: 4,621.79 ms
+- iteration_duration p95: 4,622.79 ms
+- dropped_iterations: 2,514
+- vus_max: 1,220
+
+Outcome
+- Current failure profile is 8.16%, with tail latency indicating load saturation under local limits.

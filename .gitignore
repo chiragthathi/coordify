@@ -1,8 +1,33 @@
-node_modules
-dist
-.env
-.vscode
-*.md
-*.log
-.DS_Store
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+**/build/
+**/.cache/
+
+# Logs
+**/*.log
+
+# OS/editor files
+**/.DS_Store
+**/Thumbs.db
+**/.vscode/
+
+# Environment files
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+
+# README files (workspace-wide)
+**/README
+**/README.*
+**/readme
+**/readme.*
+
+# Keep only this top-level project README tracked
+!README.md
+
+# Coverage
 coverage

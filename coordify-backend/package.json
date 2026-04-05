@@ -1,0 +1,21 @@
+{
+  "name": "coordify-backend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "db:init": "node ./scripts/init-mongo-databases.cjs",
+    "load:test:local": "powershell -ExecutionPolicy Bypass -File ./scripts/run-load-test-local.ps1",
+    "load:test:local:strict": "powershell -ExecutionPolicy Bypass -File ./scripts/run-load-test-local.ps1 -NoThresholds:$false",
+    "test:auth": "npm test --prefix ./services/auth-service",
+    "test:projects": "npm test --prefix ./services/projects-service",
+    "test:tasks": "npm test --prefix ./services/tasks-service",
+    "test:team": "npm test --prefix ./services/team-service",
+    "test:notifications": "npm test --prefix ./services/notifications-service",
+    "test:reports": "npm test --prefix ./services/reports-service",
+    "test:settings": "npm test --prefix ./services/settings-service",
+    "test:gateway": "npm test --prefix ./services/api-gateway"
+  },
+  "dependencies": {
+    "mongodb": "^6.17.0"
+  }
+}

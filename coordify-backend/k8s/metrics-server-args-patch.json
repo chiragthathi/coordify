@@ -1,0 +1,12 @@
+[
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/0/args",
+    "value": [
+      "--kubelet-insecure-tls",
+      "--kubelet-preferred-address-types=InternalIP",
+      "--kubelet-use-node-status-port",
+      "--metric-resolution=15s"
+    ]
+  }
+]
