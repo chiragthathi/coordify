@@ -23,6 +23,9 @@
 # Markdown files
 **/*.md
 
+# Frontend archived docs
+coordify/docs/archive/
+
 # README files (workspace-wide)
 **/README
 **/README.*
