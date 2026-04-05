@@ -20,6 +20,9 @@
 **/*.env
 **/*.env.*
 
+# Markdown files
+**/*.md
+
 # README files (workspace-wide)
 **/README
 **/README.*
