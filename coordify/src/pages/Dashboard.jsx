@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   BarChart,
@@ -581,22 +581,44 @@ export const Dashboard = () => {
   const generateTeamReportAsync = useAsync(reportService.generateTeamReport)
   const createTaskAsync = useAsync(taskService.create)
 
+  const loadReports = useCallback(async () => {
+    try {
+      const response = await reportService.list()
+      const reports = Array.isArray(response?.data) ? response.data : []
+      const normalized = reports.slice(-5).reverse()
+      setRecentReports(normalized)
+      setSelectedReport((previous) => {
+        if (!previous?.id) {
+          return normalized[0] || null
+        }
+
+        const refreshed = normalized.find((report) => report.id === previous.id)
+        return refreshed || normalized[0] || null
+      })
+    } catch {
+      setRecentReports([])
+      setSelectedReport(null)
+    }
+  }, [])
+
   useEffect(() => {
-    const loadReports = async () => {
-      try {
-        const response = await reportService.list()
-        const reports = Array.isArray(response?.data) ? response.data : []
-        const normalized = reports.slice(-5).reverse()
-        setRecentReports(normalized)
-        setSelectedReport(normalized[0] || null)
-      } catch {
-        setRecentReports([])
-        setSelectedReport(null)
-      }
+    loadReports()
+
+    const intervalId = setInterval(() => {
+      loadReports()
+    }, 30000)
+
+    const handleFocus = () => {
+      loadReports()
     }
 
-    loadReports()
-  }, [])
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadReports])
 
   const showToast = (message, type = 'success') => {
     setAssistantMessage({ message, type })
@@ -630,11 +652,10 @@ export const Dashboard = () => {
 
     const result = await generateReportAsync.execute(projects[0].id)
     if (result.success) {
-      const created = result?.data
-      if (created) {
-        setRecentReports((prev) => [created, ...prev].slice(0, 5))
-        setSelectedReport(created)
-      }
+      await loadReports()
+      setTimeout(() => {
+        loadReports()
+      }, 1500)
       showToast('Project report generated.')
     }
   }
@@ -642,11 +663,10 @@ export const Dashboard = () => {
   const handleGenerateTeamReport = async () => {
     const result = await generateTeamReportAsync.execute()
     if (result.success) {
-      const created = result?.data
-      if (created) {
-        setRecentReports((prev) => [created, ...prev].slice(0, 5))
-        setSelectedReport(created)
-      }
+      await loadReports()
+      setTimeout(() => {
+        loadReports()
+      }, 1500)
       showToast('Team report generated.')
     }
   }

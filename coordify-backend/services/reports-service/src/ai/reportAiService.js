@@ -79,9 +79,15 @@ const requestGemini = async (report) => {
 }
 
 export const generateAiReport = async (report) => {
+  const deterministicChartData = Object.entries(report.summary || {}).map(([metric, value]) => ({
+    metric,
+    value: Number(value) || 0,
+  }))
+
   if (!env.aiReportsEnabled || !env.geminiApiKey) {
     return {
       ...fallbackTemplate(report),
+      chartData: deterministicChartData,
       provider: 'fallback',
       model: 'deterministic-template',
     }
@@ -91,6 +97,7 @@ export const generateAiReport = async (report) => {
     const aiResult = await requestGemini(report)
     return {
       ...aiResult,
+      chartData: deterministicChartData,
       provider: 'gemini',
       model: env.geminiModel,
     }
@@ -99,6 +106,7 @@ export const generateAiReport = async (report) => {
     console.error(error)
     return {
       ...fallbackTemplate(report),
+      chartData: deterministicChartData,
       provider: 'fallback',
       model: 'deterministic-template',
     }

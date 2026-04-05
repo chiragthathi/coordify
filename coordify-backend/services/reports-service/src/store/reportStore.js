@@ -13,7 +13,7 @@ const getCollection = async () => {
 export const reportStore = {
   async all() {
     const collection = await getCollection()
-    return collection.find({}).toArray()
+    return collection.find({}).sort({ generatedAt: -1, _id: -1 }).toArray()
   },
   async getById(id) {
     const collection = await getCollection()

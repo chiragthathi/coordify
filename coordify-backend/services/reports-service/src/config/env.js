@@ -31,4 +31,9 @@ export const env = {
   geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
   internalServiceAuthEnabled: process.env.INTERNAL_SERVICE_AUTH_ENABLED !== 'false',
   internalServiceToken: process.env.INTERNAL_SERVICE_TOKEN || 'replace-with-strong-shared-token',
+  tasksServiceUrl: process.env.TASKS_SERVICE_URL || 'http://tasks-service:4003',
+  teamServiceUrl: process.env.TEAM_SERVICE_URL || 'http://team-service:4004',
+  projectsServiceUrl: process.env.PROJECTS_SERVICE_URL || 'http://projects-service:4002',
+  internalRequestTimeoutMs: Number(process.env.INTERNAL_REQUEST_TIMEOUT_MS || 7000),
+  internalRequestRetries: Number(process.env.INTERNAL_REQUEST_RETRIES || 1),
 }
