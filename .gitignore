@@ -6,6 +6,10 @@
 **/build/
 **/.cache/
 
+# Track frontend build output in this repository
+!coordify/dist/
+!coordify/dist/**
+
 # Logs
 **/*.log
 
